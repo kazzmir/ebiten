@@ -318,6 +318,60 @@ func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
 	}
 }
 
+func TestShaderImportUniformsFunction(t *testing.T) {
+	const w, h = 16, 16
+
+	dst := ebiten.NewImage(w, h)
+
+	helpers := `//kage:unit pixels
+package helpers
+
+// this variable looks like a uniform but will not be set since it is
+// not in the main package
+var Red float
+
+func clr(red float) (float, float, float, float) {
+	return red, 0, 0, 1
+}
+`
+
+	shaderImports := map[string][]byte{
+		"helpers": []byte(helpers),
+	}
+
+	s, err := ebiten.NewShaderWithImports([]byte(`//kage:unit pixels
+
+package main
+
+import "helpers"
+
+var Red float
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	return vec4(helpers.clr(Red))
+}
+`), shaderImports)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dst.DrawRectShader(w, h, s, &ebiten.DrawRectShaderOptions{
+        Uniforms: map[string]any{
+            "Red": float32(0.8),
+        },
+    })
+
+	for j := range h {
+		for i := range w {
+			got := dst.At(i, j).(color.RGBA)
+			want := color.RGBA{R: uint8(0xff * 0.8), A: 0xff}
+			if got != want {
+				t.Errorf("dst.At(%d, %d): got: %v, want: %v", i, j, got, want)
+			}
+		}
+	}
+}
+
 func TestShaderUninitializedUniformVariables(t *testing.T) {
 	const w, h = 16, 16
 
