@@ -40,11 +40,23 @@ type Shader struct {
 //
 // For the details about the shader, see https://ebitengine.org/en/documents/shader.html.
 func NewShader(src []byte) (*Shader, error) {
-	return newShader(src, "")
+	return newShaderWithImports(src, nil, "")
+}
+
+// NewShaderWithImports compiles a shader program in the shading language Kage with imported shader sources.
+//
+// The imports map is keyed by import path. For example, import "helpers" resolves selectors like helpers.foo
+// against the package-level declarations in imports["helpers"].
+func NewShaderWithImports(src []byte, imports map[string][]byte) (*Shader, error) {
+	return newShaderWithImports(src, imports, "")
 }
 
 func newShader(src []byte, name string) (*Shader, error) {
-	ir, err := graphics.CompileShader(src)
+	return newShaderWithImports(src, nil, name)
+}
+
+func newShaderWithImports(src []byte, imports map[string][]byte, name string) (*Shader, error) {
+	ir, err := graphics.CompileShaderWithImports(src, imports)
 	if err != nil {
 		return nil, err
 	}

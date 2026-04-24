@@ -52,6 +52,7 @@ type compileState struct {
 	vertexEntry   string
 	fragmentEntry string
 	unit          shaderir.Unit
+	imports       map[string]map[string]string
 
 	ir shaderir.Program
 
@@ -183,6 +184,10 @@ func (p *ParseError) Error() string {
 }
 
 func Compile(src []byte, vertexEntry, fragmentEntry string, textureCount int) (*shaderir.Program, error) {
+	return CompileWithImports(src, nil, vertexEntry, fragmentEntry, textureCount)
+}
+
+func CompileWithImports(src []byte, imports map[string]map[string]string, vertexEntry, fragmentEntry string, textureCount int) (*shaderir.Program, error) {
 	unit, err := ParseCompilerDirectives(src)
 	if err != nil {
 		return nil, err
@@ -199,6 +204,7 @@ func Compile(src []byte, vertexEntry, fragmentEntry string, textureCount int) (*
 		vertexEntry:   vertexEntry,
 		fragmentEntry: fragmentEntry,
 		unit:          unit,
+		imports:       imports,
 	}
 	s.ir.SourceHash = shaderir.CalcSourceHash(src)
 	s.global.ir = &shaderir.Block{}
@@ -253,6 +259,23 @@ func ParseCompilerDirectives(src []byte) (shaderir.Unit, error) {
 func (s *compileState) addError(pos token.Pos, str string) {
 	p := s.fs.Position(pos)
 	s.errs = append(s.errs, fmt.Sprintf("%s: %s", p, str))
+}
+
+func (cs *compileState) importedName(expr *ast.SelectorExpr) (name string, imported bool, valid bool) {
+	pkg, ok := expr.X.(*ast.Ident)
+	if !ok || pkg.Obj != nil {
+		return "", false, false
+	}
+	members, ok := cs.imports[pkg.Name]
+	if !ok {
+		return "", false, false
+	}
+	name, ok = members[expr.Sel.Name]
+	if !ok {
+		cs.addError(expr.Pos(), fmt.Sprintf("package %s has no member %s", pkg.Name, expr.Sel.Name))
+		return "", true, false
+	}
+	return name, true, true
 }
 
 func (cs *compileState) parse(f *ast.File) {
@@ -540,7 +563,15 @@ func (cs *compileState) functionReturnTypes(block *block, expr ast.Expr) ([]shad
 
 	ident, ok := call.Fun.(*ast.Ident)
 	if !ok {
-		return nil, false
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return nil, false
+		}
+		name, imported, valid := cs.importedName(selector)
+		if !imported || !valid {
+			return nil, false
+		}
+		ident = ast.NewIdent(name)
 	}
 
 	for _, f := range cs.funcs {

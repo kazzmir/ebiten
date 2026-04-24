@@ -181,6 +181,19 @@ func completeShaderSource(fragmentSrc []byte) ([]byte, error) {
 }
 
 func CompileShader(fragmentSrc []byte) (*shaderir.Program, error) {
+	return CompileShaderWithImports(fragmentSrc, nil)
+}
+
+func CompileShaderWithImports(fragmentSrc []byte, imports map[string][]byte) (*shaderir.Program, error) {
+	var mappings map[string]map[string]string
+	var err error
+	if len(imports) > 0 {
+		fragmentSrc, mappings, err = shader.ResolveImports(fragmentSrc, imports)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	src, err := completeShaderSource(fragmentSrc)
 	if err != nil {
 		return nil, err
@@ -190,7 +203,7 @@ func CompileShader(fragmentSrc []byte) (*shaderir.Program, error) {
 		vert = "__vertex"
 		frag = "Fragment"
 	)
-	ir, err := shader.Compile(src, vert, frag, ShaderSrcImageCount)
+	ir, err := shader.CompileWithImports(src, mappings, vert, frag, ShaderSrcImageCount)
 	if err != nil {
 		return nil, err
 	}

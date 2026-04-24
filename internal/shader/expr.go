@@ -986,6 +986,13 @@ func (cs *compileState) parseExpr(block *block, fname string, expr ast.Expr, mar
 		return cs.parseExpr(block, fname, e.X, markLocalVariableUsed)
 
 	case *ast.SelectorExpr:
+		if name, imported, valid := cs.importedName(e); imported {
+			if !valid {
+				return nil, nil, nil, false
+			}
+			return cs.parseExpr(block, fname, ast.NewIdent(name), markLocalVariableUsed)
+		}
+
 		exprs, types, stmts, ok := cs.parseExpr(block, fname, e.X, true)
 		if !ok {
 			return nil, nil, nil, false

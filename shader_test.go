@@ -274,6 +274,50 @@ func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
 	}
 }
 
+func TestShaderImportFunction(t *testing.T) {
+	const w, h = 16, 16
+
+	dst := ebiten.NewImage(w, h)
+
+	helpers := `//kage:unit pixels
+package helpers
+
+func clr(red float) (float, float, float, float) {
+	return red, 0, 0, 1
+}
+`
+
+	shaderImports := map[string][]byte{
+		"helpers": []byte(helpers),
+	}
+
+	s, err := ebiten.NewShaderWithImports([]byte(`//kage:unit pixels
+
+package main
+
+import "helpers"
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	return vec4(helpers.clr(1))
+}
+`), shaderImports)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dst.DrawRectShader(w, h, s, nil)
+
+	for j := range h {
+		for i := range w {
+			got := dst.At(i, j).(color.RGBA)
+			want := color.RGBA{R: 0xff, A: 0xff}
+			if got != want {
+				t.Errorf("dst.At(%d, %d): got: %v, want: %v", i, j, got, want)
+			}
+		}
+	}
+}
+
 func TestShaderUninitializedUniformVariables(t *testing.T) {
 	const w, h = 16, 16
 

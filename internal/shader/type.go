@@ -55,6 +55,16 @@ func (cs *compileState) parseType(block *block, fname string, expr ast.Expr) (sh
 			cs.addError(t.Pos(), fmt.Sprintf("unexpected type: %s", t.Name))
 			return shaderir.Type{}, false
 		}
+	case *ast.SelectorExpr:
+		name, imported, valid := cs.importedName(t)
+		if !imported {
+			cs.addError(t.Pos(), fmt.Sprintf("unexpected type: %s", t))
+			return shaderir.Type{}, false
+		}
+		if !valid {
+			return shaderir.Type{}, false
+		}
+		return cs.parseType(block, fname, ast.NewIdent(name))
 	case *ast.ArrayType:
 		if t.Len == nil {
 			cs.addError(t.Pos(), "array length must be specified")
